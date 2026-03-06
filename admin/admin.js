@@ -345,3 +345,47 @@ async function saveToGitHub(filePath, content, message) {
   
   return true;
 }
+
+// === TOKEN MANAGEMENT FUNCTIONS ===
+
+// Save GitHub token from UI input
+function saveToken() {
+  const token = document.getElementById('github-token-input').value.trim();
+  if(!token) {
+    alert('Please enter your GitHub token');
+    return;
+  }
+  if(!token.startsWith('ghp_')) {
+    alert('Token should start with "ghp_"');
+    return;
+  }
+  
+  localStorage.setItem('githubToken', token);
+  document.getElementById('github-token-input').value = ''; // Clear input
+  document.getElementById('token-status').style.display = 'block';
+  
+  // Hide status after 3 seconds
+  setTimeout(() => {
+    document.getElementById('token-status').style.display = 'none';
+  }, 3000);
+  
+  console.log('✅ GitHub token saved');
+}
+
+// Check token on page load and show status
+document.addEventListener('DOMContentLoaded', () => {
+  const token = localStorage.getItem('githubToken');
+  const statusEl = document.getElementById('token-status');
+  
+  if(token && token.startsWith('ghp_')) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = '✅ GitHub token is set. You can save products and upload images.';
+    statusEl.style.background = '#e8f5e9';
+    statusEl.style.color = '#2e7d32';
+  } else {
+    statusEl.style.display = 'block';
+    statusEl.textContent = '⚠️ GitHub token not set. Please paste your token above to enable saving.';
+    statusEl.style.background = '#fff3e0';
+    statusEl.style.color = '#ef6c00';
+  }
+});
