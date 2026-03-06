@@ -3,7 +3,7 @@ const GITHUB_USERNAME = 'sotuonunyo';
 const REPO_NAME = 'candle-shop';
 const BRANCH = 'main';
 
-// GitHub API base URL
+// GitHub API base URL - NO SPACES!
 const API_BASE = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}`;
 
 // Check if admin is logged in
@@ -31,13 +31,17 @@ async function loadProducts() {
     const products = await response.json();
     renderProductList(products);
   } catch(error) {
-    document.getElementById('product-list').innerHTML = '<p>No products yet. Add your first product above!</p>';
+    const container = document.getElementById('product-list');
+    if(container) {
+      container.innerHTML = '<p>No products yet. Add your first product above!</p>';
+    }
   }
 }
 
 // Render Product List in Admin
 function renderProductList(products) {
   const container = document.getElementById('product-list');
+  if(!container) return;
   
   if(!products || products.length === 0) {
     container.innerHTML = '<p>No products yet. Add your first product above!</p>';
@@ -88,10 +92,8 @@ async function saveProduct(event) {
     if(!Array.isArray(products)) products = [];
     
     if(editIndex !== '') {
-      // Update existing product
       products[editIndex] = newProduct;
     } else {
-      // Add new product
       products.push(newProduct);
     }
     
@@ -99,8 +101,12 @@ async function saveProduct(event) {
     await saveToGitHub('_data/products.json', JSON.stringify(products, null, 2), 'Update products');
     
     // Show success & reset form
-    document.getElementById('form-success').style.display = 'block';
-    setTimeout(() => document.getElementById('form-success').style.display = 'none', 3000);
+    const successEl = document.getElementById('form-success');
+    if(successEl) {
+      successEl.style.display = 'block';
+      setTimeout(() => successEl.style.display = 'none', 3000);
+    }
+    
     document.getElementById('product-form').reset();
     document.getElementById('edit-index').value = '';
     document.getElementById('form-title').textContent = '➕ Add New Product';
@@ -112,9 +118,12 @@ async function saveProduct(event) {
     
   } catch(error) {
     console.error('Error saving product:', error);
-    document.getElementById('form-error').textContent = 'Error: ' + error.message;
-    document.getElementById('form-error').style.display = 'block';
-    setTimeout(() => document.getElementById('form-error').style.display = 'none', 5000);
+    const errorEl = document.getElementById('form-error');
+    if(errorEl) {
+      errorEl.textContent = 'Error: ' + error.message;
+      errorEl.style.display = 'block';
+      setTimeout(() => errorEl.style.display = 'none', 5000);
+    }
   }
 }
 
@@ -185,24 +194,27 @@ function previewImage(event) {
   }
 }
 
-// Upload Image to GitHub (Base64 Method)
+// ✅ FIXED: Upload Image to GitHub (Auto-creates images/ folder)
 async function uploadImageToGitHub(file) {
-  const fileName = `images/${Date.now()}-${file.name.replace(/\s/g, '-')}`;
+  const token = localStorage.getItem('githubToken');
+  if(!token) {
+    alert('⚠️ GitHub token not set! Please paste your token at the top of the dashboard.');
+    return '';
+  }
+
+  // Create safe filename
+  const safeName = file.name.replace(/\s/g, '-').replace(/[^a-zA-Z0-9.-]/g, '');
+  const fileName = `images/${Date.now()}-${safeName}`;
   
-  // Convert to base64
+  // Convert file to base64
   const base64 = await new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result.split(',')[1]);
     reader.readAsDataURL(file);
   });
-  
-  // Get GitHub token from localStorage
-  const token = localStorage.getItem('githubToken');
-  if(!token) {
-    alert('⚠️ GitHub token not set!\n\nPlease open Developer Console (F12) and run:\nlocalStorage.setItem("githubToken", "ghp_your_token_here")\n\nThen try again.');
-    return '';
-  }
-  
+
+  console.log('📤 Uploading:', fileName);
+
   try {
     const response = await fetch(`${API_BASE}/contents/${fileName}`, {
       method: 'PUT',
@@ -211,22 +223,31 @@ async function uploadImageToGitHub(file) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        message: `Upload image: ${file.name}`,
+        message: `Upload: ${file.name}`,
         content: base64,
         branch: BRANCH
       })
     });
-    
-    if(response.ok) {
-      // Return the public GitHub Pages URL
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log('✅ Upload success');
       return `https://${GITHUB_USERNAME}.github.io/${REPO_NAME}/${fileName}`;
     } else {
-      const err = await response.json();
-      throw new Error(err.message || 'Upload failed');
+      console.error('❌ Upload failed:', data);
+      let msg = data.message || 'Upload failed';
+      
+      if(msg.includes('401')) msg = 'Invalid token. Re-save your token.';
+      else if(msg.includes('403')) msg = 'Token needs "repo" permission.';
+      else if(msg.includes('404')) msg = 'Repo not found. Check username/repo in admin.js';
+      
+      alert('Image upload failed: ' + msg);
+      return '';
     }
-  } catch(error) {
-    console.error('Image upload error:', error);
-    alert('Image upload failed: ' + error.message + '\n\nTip: Make sure your image is under 5MB.');
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    alert('Upload failed: ' + error.message);
     return '';
   }
 }
@@ -237,17 +258,17 @@ async function loadSettings() {
     const response = await fetch(`https://${GITHUB_USERNAME}.github.io/${REPO_NAME}/_data/settings.json`);
     const settings = await response.json();
     
-    document.getElementById('set-whatsapp').value = settings.whatsapp || '';
-    document.getElementById('set-bank').value = settings.bankName || '';
-    document.getElementById('set-account-num').value = settings.accountNumber || '';
-    document.getElementById('set-account-name').value = settings.accountName || '';
-    document.getElementById('set-address').value = settings.address || '';
-    document.getElementById('set-phone').value = settings.phone || '';
-    document.getElementById('set-email').value = settings.email || '';
-    document.getElementById('set-hours').value = settings.hours || '';
-    document.getElementById('set-theme').value = settings.theme || 'default';
+    const fields = ['whatsapp', 'bank', 'account-num', 'account-name', 'address', 'phone', 'email', 'hours', 'theme'];
+    const keys = ['whatsapp', 'bankName', 'accountNumber', 'accountName', 'address', 'phone', 'email', 'hours', 'theme'];
+    
+    fields.forEach((field, i) => {
+      const el = document.getElementById(`set-${field}`);
+      if(el && settings[keys[i]]) {
+        el.value = settings[keys[i]];
+      }
+    });
   } catch(error) {
-    console.log('No settings file yet - will create on first save');
+    console.log('No settings yet');
   }
 }
 
@@ -268,9 +289,12 @@ async function saveSettings(event) {
   };
   
   try {
-    await saveToGitHub('_data/settings.json', JSON.stringify(settings, null, 2), 'Update business settings');
-    document.getElementById('settings-success').style.display = 'block';
-    setTimeout(() => document.getElementById('settings-success').style.display = 'none', 3000);
+    await saveToGitHub('_data/settings.json', JSON.stringify(settings, null, 2), 'Update settings');
+    const successEl = document.getElementById('settings-success');
+    if(successEl) {
+      successEl.style.display = 'block';
+      setTimeout(() => successEl.style.display = 'none', 3000);
+    }
   } catch(error) {
     alert('Error saving settings: ' + error.message);
   }
@@ -283,6 +307,8 @@ async function loadMailingList() {
     const list = await response.json();
     
     const container = document.getElementById('mailing-list');
+    if(!container) return;
+    
     if(!list || list.length === 0) {
       container.innerHTML = '<p>No subscribers yet.</p>';
       return;
@@ -295,7 +321,8 @@ async function loadMailingList() {
       </div>
     `).join('');
   } catch(error) {
-    document.getElementById('mailing-list').innerHTML = '<p>No subscribers yet.</p>';
+    const container = document.getElementById('mailing-list');
+    if(container) container.innerHTML = '<p>No subscribers yet.</p>';
   }
 }
 
@@ -303,24 +330,23 @@ async function loadMailingList() {
 async function saveToGitHub(filePath, content, message) {
   const token = localStorage.getItem('githubToken');
   if(!token) {
-    throw new Error('GitHub token not set. Open Console and run: localStorage.setItem("githubToken", "ghp_your_token")');
+    throw new Error('GitHub token not set');
   }
   
-  // First, get the current file SHA (if it exists)
+  // Get existing file SHA (if exists)
   let sha = '';
   try {
-    const response = await fetch(`${API_BASE}/contents/${filePath}?ref=${BRANCH}`, {
+    const res = await fetch(`${API_BASE}/contents/${filePath}?ref=${BRANCH}`, {
       headers: { 'Authorization': `token ${token}` }
     });
-    if(response.ok) {
-      const data = await response.json();
+    if(res.ok) {
+      const data = await res.json();
       sha = data.sha;
     }
   } catch(e) {
-    // File doesn't exist yet, that's ok - we'll create it
+    // File doesn't exist - that's ok
   }
   
-  // Prepare the request body
   const body = {
     message: message,
     content: btoa(unescape(encodeURIComponent(content))),
@@ -328,7 +354,6 @@ async function saveToGitHub(filePath, content, message) {
   };
   if(sha) body.sha = sha;
   
-  // Save the file
   const response = await fetch(`${API_BASE}/contents/${filePath}`, {
     method: 'PUT',
     headers: {
@@ -346,9 +371,8 @@ async function saveToGitHub(filePath, content, message) {
   return true;
 }
 
-// === TOKEN MANAGEMENT FUNCTIONS ===
+// === TOKEN MANAGEMENT ===
 
-// Save GitHub token from UI input
 function saveToken() {
   const token = document.getElementById('github-token-input').value.trim();
   if(!token) {
@@ -361,30 +385,32 @@ function saveToken() {
   }
   
   localStorage.setItem('githubToken', token);
-  document.getElementById('github-token-input').value = ''; // Clear input
-  document.getElementById('token-status').style.display = 'block';
+  document.getElementById('github-token-input').value = '';
   
-  // Hide status after 3 seconds
-  setTimeout(() => {
-    document.getElementById('token-status').style.display = 'none';
-  }, 3000);
-  
-  console.log('✅ GitHub token saved');
+  const statusEl = document.getElementById('token-status');
+  if(statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = '✅ GitHub token saved!';
+    statusEl.style.background = '#e8f5e9';
+    statusEl.style.color = '#2e7d32';
+    setTimeout(() => statusEl.style.display = 'none', 3000);
+  }
+  console.log('✅ Token saved');
 }
 
-// Check token on page load and show status
 document.addEventListener('DOMContentLoaded', () => {
   const token = localStorage.getItem('githubToken');
   const statusEl = document.getElementById('token-status');
+  if(!statusEl) return;
   
   if(token && token.startsWith('ghp_')) {
     statusEl.style.display = 'block';
-    statusEl.textContent = '✅ GitHub token is set. You can save products and upload images.';
+    statusEl.textContent = '✅ GitHub token is set.';
     statusEl.style.background = '#e8f5e9';
     statusEl.style.color = '#2e7d32';
   } else {
     statusEl.style.display = 'block';
-    statusEl.textContent = '⚠️ GitHub token not set. Please paste your token above to enable saving.';
+    statusEl.textContent = '⚠️ GitHub token not set. Paste token above.';
     statusEl.style.background = '#fff3e0';
     statusEl.style.color = '#ef6c00';
   }
