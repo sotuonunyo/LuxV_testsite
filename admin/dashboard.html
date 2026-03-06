@@ -76,9 +76,20 @@
 </head>
 <body>
   <div class="admin-header">
-    <h2>🕯️ Luxvira Admin</h2>
-    <button onclick="logout()">Logout</button>
+  <h2>🕯️ Luxvira Admin</h2>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <input type="password" id="github-token-input" placeholder="GitHub Token" 
+           style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
+    <button onclick="saveToken()" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Save Token</button>
+    <button onclick="logout()" style="padding: 8px 15px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Logout</button>
   </div>
+</div>
+
+<!-- Token Status Message -->
+<div id="token-status" style="text-align: center; padding: 10px; background: #e8f5e9; color: #2e7d32; display: none; margin: 10px 0; border-radius: 4px;">
+  ✅ GitHub token saved! You can now upload images and save products.
+</div>
+  
 
   <div class="admin-container">
     
